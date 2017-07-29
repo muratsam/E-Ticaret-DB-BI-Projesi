@@ -1,0 +1,44 @@
+
+Create PROCEDURE Ürün_Öneri
+    @MüşteriID int = 0
+AS
+--Module 1 Favori Kategori Bulunması
+declare @favoriKat varchar(max)
+
+
+select @FavoriKat=p.Adı --Favori Kategori
+From( select top 1  t.Adı,t.Müşteri_ID,count(*) 'Sipariş Sayisi' 
+
+from(select 
+	s.Müşteri_ID,
+		s.Sipariş_Tarihi,
+			s.Sipariş_ID,
+			k.Adı,
+				ROW_NUMBER() over (partition by s.Müşteri_ID order by Sipariş_Tarihi desc) 'row' -- Müşteriye ait son siparişler
+from Sipariş s
+	join SiparişDetaay s1 on s1.Sipariş_ID=s.Sipariş_ID 
+		join Ürün ü on ü.ÜrünID=s1.Ürün_ID 
+			join Kategori k on k.KatID=ü.KatID
+			 where s.Müşteri_ID=@MüşteriID) as t 
+			where t.row<=10					--Son 10 sipariş
+			group by t.Adı,t.Müşteri_ID
+			order by 3 desc) as p
+
+--Module 2 Kategoriye ait Fav Ürün Bulunması
+
+SELECT t.Ürünadı,@FavoriKat 'Kategori' --Önerilmesi
+From (Select top 3 p.Ürünadı
+		,sum(p.Miktar) 'Sipariş Miktarı'
+from(select 
+		ü.Adı 'Ürünadı',
+		 s1.Miktar,
+			ROW_NUMBER() over (partition by ü.Adı order by Sipariş_Tarihi desc) 'row' -- Kategoriye Ait son siparişler
+from Sipariş s 
+	join SiparişDetaay s1 on s1.Sipariş_ID=s.Sipariş_ID 
+		join Ürün ü on ü.ÜrünID=s1.Ürün_ID 
+			join Kategori k on k.KatID=ü.KatID
+					where k.Adı = @FavoriKat and ü.[Üretimde mi?]=1) as p -- üretimde mi kontrol edilmesi
+					where p.row <=20    --Son 20 sipariş alınması
+		group by p.Ürünadı
+		order by 2 desc) as t
+RETURN 0 

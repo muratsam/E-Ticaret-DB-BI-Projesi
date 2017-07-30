@@ -1,0 +1,97 @@
+--a.	Toplam ücret olarak ortalama satış miktarının üzerine çıkan satışlarımdan ilk 50 sine ait ürünleri listeleyiniz.
+use InteriorMobilya  
+go
+create view OrtalamaUzerinde50Satıs 
+as
+SELECT    top 50    SiparişDetaay.Sipariş_ID, Ürün.Adı
+FROM            SiparişDetaay INNER JOIN
+                         Ürün ON SiparişDetaay.Ürün_ID = Ürün.ÜrünID where SiparişDetaay.Sipariş_ID in
+(
+SELECT   Sipariş.Sipariş_ID
+FROM  Sipariş INNER JOIN
+            SiparişDetaay ON Sipariş.Sipariş_ID = SiparişDetaay.Sipariş_ID INNER JOIN
+				Ürün ON SiparişDetaay.Ürün_ID = Ürün.ÜrünID 
+				group by Sipariş.Sipariş_ID
+				having sum(SiparişDetaay.Fiyat*SiparişDetaay.Miktar*(1-SiparişDetaay.İndirim))> avg(SiparişDetaay.Fiyat*SiparişDetaay.Miktar*(1-SiparişDetaay.İndirim)))
+						 
+go						 
+						 
+						 
+						 
+--b.	Adet olarak en çok satın alınan ürünü satın alan müşterilerin ülkelerine hangi yıllarda kaç adet ürün satışı yapılmıştır?
+
+go
+create view Adetolaraken  
+as
+SELECT        YEAR(Sipariş.Sipariş_Tarihi) 'Yıllar', Ülke.ÜlkeAdı, sum(SiparişDetaay.Miktar) 'Ürün Adeti'
+FROM            [Kullanıcı Detay] INNER JOIN
+                         Sipariş ON [Kullanıcı Detay].Müşteri_ID = Sipariş.Müşteri_ID INNER JOIN
+                         SiparişDetaay ON Sipariş.Sipariş_ID = SiparişDetaay.Sipariş_ID INNER JOIN
+                         Şehir ON [Kullanıcı Detay].Şehir_ID = Şehir.Şehir_ID AND Sipariş.Şehir_ID = Şehir.Şehir_ID INNER JOIN
+                         Ülke ON Şehir.Ülke_ID = Ülke.Ülke_ID where Ülke.ÜlkeAdı in
+ (SELECT        Distinct ÜlkeAdı
+FROM            SiparişDetaay INNER JOIN
+                         Sipariş ON SiparişDetaay.Sipariş_ID = Sipariş.Sipariş_ID INNER JOIN
+                         Ürün ON SiparişDetaay.Ürün_ID = Ürün.ÜrünID INNER JOIN
+                         [Kullanıcı Detay] ON Sipariş.Müşteri_ID = [Kullanıcı Detay].Müşteri_ID INNER JOIN
+						 Şehir on Şehir.Şehir_ID=[Kullanıcı Detay].Şehir_ID INNER JOIN
+						 Ülke on Ülke.Ülke_ID=Şehir.Şehir_ID
+						 where ürün.Adı in(
+SELECT t.Adı FROM(SELECT   top 1     Ürün.Adı, sum(SiparişDetaay.Miktar)'mik'
+FROM            SiparişDetaay INNER JOIN
+                         Ürün ON SiparişDetaay.Ürün_ID = Ürün.ÜrünID
+						 group by Ürün.Adı
+						 order by 2 desc) as t)) group by YEAR(Sipariş.Sipariş_Tarihi), Ülke.ÜlkeAdı
+
+go
+
+--c.	Adet olarak toplam 100 ün üzerinde ürün satılmış hangi kategorilerden, hangi ülkelere ücret olarak toplam ne kadarlık satış yapılmıştır?
+create view Adetolaraktoplam 
+as
+SELECT   ÜlkeAdı,   sum(SiparişDetaay.Fiyat*SiparişDetaay.Miktar*(1-SiparişDetaay.İndirim))  'Para' 
+FROM            Ülke INNER JOIN
+                         Şehir ON Ülke.Ülke_ID = Şehir.Ülke_ID INNER JOIN
+                         Sipariş ON Şehir.Şehir_ID = Sipariş.Şehir_ID INNER JOIN
+                         SiparişDetaay ON Sipariş.Sipariş_ID = SiparişDetaay.Sipariş_ID INNER JOIN
+						 Ürün on ürün.ÜrünID=SiparişDetaay.Ürün_ID
+						 where ürün.KatID in
+(SELECT distinct   Ürün.KatID     
+FROM            SiparişDetaay join Ürün on SiparişDetaay.Ürün_ID=Ürün.ÜrünID 
+group by Ürün.ÜrünID,Ürün.KatID
+having sum(Miktar)>100) group by ÜlkeAdı
+
+--d.	Hangi ülkelere hangi ürünler için kaç kere satış sonrası desteği sağlanmıştır?
+
+go
+create view Hangiülkelere 
+as
+SELECT  ürün.Adı,Ülke.ÜlkeAdı,count(distinct SSD.SSID) 'Satış sonrası Destek Sayısı'     
+FROM            Ürün INNER JOIN
+                         SiparişDetaay ON Ürün.ÜrünID = SiparişDetaay.Ürün_ID INNER JOIN
+                         Sipariş ON SiparişDetaay.Sipariş_ID = Sipariş.Sipariş_ID INNER JOIN
+                         Ülke INNER JOIN
+                         Şehir ON Ülke.Ülke_ID = Şehir.Ülke_ID INNER JOIN
+                         [Kullanıcı Detay] ON Şehir.Şehir_ID = [Kullanıcı Detay].Şehir_ID ON Sipariş.Şehir_ID = Şehir.Şehir_ID INNER JOIN
+                         SSD ON Sipariş.SSD_ID = SSD.SSID
+						 where SSD.SSID != 0
+						 group by ürün.Adı,Ülke.ÜlkeAdı
+
+
+
+--e.	Şimdiye kadar hiç yerinde kurulum yapılmamış ürünlerden hangi yıl ücret olarak ortalama ne kadar satış yapılmıştır?
+
+go
+
+create view Şimdiyekadarhiç
+as
+SELECT      YEAR(Sipariş.Sipariş_Tarihi) 'Yıl' ,avg(SiparişDetaay.Fiyat*SiparişDetaay.Miktar*(1-SiparişDetaay.İndirim)) 'Miktar'
+FROM            Ürün INNER JOIN
+                         SiparişDetaay ON Ürün.ÜrünID = SiparişDetaay.Ürün_ID INNER JOIN
+                         Sipariş ON SiparişDetaay.Sipariş_ID = Sipariş.Sipariş_ID
+						 where not Ürün.ÜrünID in
+(SELECT distinct  Ürün_ID     
+FROM            Ürün INNER JOIN
+                         SiparişDetaay ON Ürün.ÜrünID = SiparişDetaay.Ürün_ID INNER JOIN
+                         Sipariş ON SiparişDetaay.Sipariş_ID = Sipariş.Sipariş_ID
+						 where Sipariş.SSD_ID =2)
+						 group by YEAR(Sipariş.Sipariş_Tarihi) 
